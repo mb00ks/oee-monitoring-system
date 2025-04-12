@@ -121,14 +121,5 @@ services:
       - oee-service
     restart: always
 
-  # # Dashboard (Streamlit)
-  # dashboard:
-  #   build: ./dashboard
-  #   ports:
-  #     - "8501:8501"
-  #   depends_on:
-  #     - oee-service
-  #   restart: always
-
 volumes:
   pgdata:
