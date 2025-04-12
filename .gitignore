@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+.venv/
+env/
+venv/
+ENV/
+
+# VSCode / JetBrains
+.vscode/
+.idea/
+
+# Docker
+**/node_modules/
+**/dist/
+**/.DS_Store
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache / backups
+*.sqlite
+*.bak
+*.swp
