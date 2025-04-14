@@ -9,6 +9,7 @@ from kafka.errors import KafkaError
 
 # Konfigurasi
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPIC = "sensor-data"
 
@@ -61,7 +62,7 @@ def retry_loop():
 client = mqtt.Client()
 client.on_connect = on_connect
 client.on_message = on_message
-client.connect(MQTT_BROKER, 1883, 60)
+client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
 # Jalankan retry buffer thread
 threading.Thread(target=retry_loop, daemon=True).start()

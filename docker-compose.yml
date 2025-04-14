@@ -11,17 +11,29 @@ services:
     volumes:
       - ./mosquitto:/mosquitto/config
     restart: always
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "${MQTT_PORT}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # Apache Kafka
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
     environment:
       - ZOOKEEPER_CLIENT_PORT=${ZOOKEEPER_CLIENT_PORT}
       - ZOOKEEPER_TICK_TIME=${ZOOKEEPER_TICK_TIME}
     restart: always
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "${ZOOKEEPER_CLIENT_PORT}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
     ports:
       - "9092:9092"
     environment:
@@ -32,6 +44,11 @@ services:
     depends_on:
       - zookeeper
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # PostgreSQL DB
   postgres:
@@ -47,52 +64,70 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d sensor_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # Sensor Simulators
   sensor-berat:
+    container_name: sensor-berat
     build: ./sensor-berat
     environment:
       - MQTT_BROKER=${MQTT_BROKER}
       - MQTT_PORT=${MQTT_PORT}
     depends_on:
-      - mqtt-broker
+      mqtt-broker:
+        condition: service_healthy      
     restart: always
 
   sensor-kecepatan:
+    container_name: sensor-kecepatan
     build: ./sensor-kecepatan
     environment:
       - MQTT_BROKER=${MQTT_BROKER}
       - MQTT_PORT=${MQTT_PORT}
     depends_on:
-      - mqtt-broker
+      mqtt-broker:
+        condition: service_healthy      
     restart: always
 
   sensor-status:
+    container_name: sensor-status
     build: ./sensor-status
     environment:
       - MQTT_BROKER=${MQTT_BROKER}
       - MQTT_PORT=${MQTT_PORT}
     depends_on:
-      - mqtt-broker
+      mqtt-broker:
+        condition: service_healthy
     restart: always
 
   # MQTT to Kafka Bridge
   mqtt-bridge:
+    container_name: mqtt-bridge
     build: ./mqtt-bridge
     depends_on:
-      - mqtt-broker
-      - kafka
+      mqtt-broker:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy      
     environment:
       - MQTT_BROKER=${MQTT_BROKER}
+      - MQTT_PORT=${MQTT_PORT}
       - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
     restart: always
 
   # Processor Service
   processor-service:
+    container_name: processor-service
     build: ./processor-service
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
       - POSTGRES_HOST=${POSTGRES_HOST}
@@ -100,17 +135,20 @@ services:
 
   # OEE API Service
   oee-service:
+    container_name: oee-service
     build: ./oee-service
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       - POSTGRES_HOST=${POSTGRES_HOST}
     restart: always
 
   # Dashboard (React)
   frontend-dashboard:
+    container_name: frontend-dashboard
     build:
       context: ./frontend-dashboard
     ports:
