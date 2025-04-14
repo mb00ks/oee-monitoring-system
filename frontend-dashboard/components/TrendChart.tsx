@@ -40,10 +40,14 @@ import {
     const a = data.map(d => d.availability)
     const p = data.map(d => d.performance)
     const q = data.map(d => d.quality)
+
+    const isDark = localStorage.getItem("theme")
+    const textColor = isDark === "dark" ? '#E5E7EB' : '#111827' // Tailwind gray-200 vs gray-900
+    const gridColor = isDark === "dark" ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
   
     return (
-      <div className="mt-6">
-        <h2 className="text-xl font-semibold mb-2">🌐 Tren OEE</h2>
+      <div className="mt-6 bg-white dark:bg-gray-900 p-4 rounded-md shadow">
+        <h2 className="text-xl font-semibold mb-2 text-gray-600 dark:text-gray-300">🌐 Tren OEE</h2>
         <Line
           data={{
             labels,
@@ -57,9 +61,27 @@ import {
               },
             ],
           }}
+          options={{
+            responsive: true,
+            scales: {
+              y: {
+                ticks: { color: textColor },
+                grid: { color: gridColor },
+              },
+              x: {
+                ticks: { color: textColor },
+                grid: { color: gridColor },
+              },
+            },
+            plugins: {
+              legend: {
+                labels: { color: textColor },
+              },
+            },
+          }}
         />
   
-        <h2 className="text-xl font-semibold mt-6 mb-2">📊 Komponen OEE</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2 text-gray-600 dark:text-gray-300">📊 Komponen OEE</h2>
         <Bar
           data={{
             labels,
@@ -83,8 +105,21 @@ import {
           }}
           options={{
             responsive: true,
+            scales: {
+              y: {
+                ticks: { color: textColor },
+                grid: { color: gridColor },
+              },
+              x: {
+                ticks: { color: textColor },
+                grid: { color: gridColor },
+              },
+            },
             plugins: {
-              legend: { position: 'top' },
+              legend: { 
+                position: 'top',
+                labels: { color: textColor },
+              },
             },
           }}
         />

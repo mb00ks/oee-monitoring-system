@@ -1,11 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import psycopg2
-from datetime import datetime
 import os
+import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Query
 from typing import Literal
 import pandas as pd
+import json
 
 app = FastAPI()
 
@@ -29,8 +30,7 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
-@app.get("/oee")
-def get_oee():
+def query_latest_oee():
     cursor.execute("""
         SELECT timestamp, berat, kecepatan, status
         FROM sensor_data
@@ -58,8 +58,26 @@ def get_oee():
         "oee": round(oee * 100, 2)
     }
 
-@app.get("/oee/trend")
-def get_oee_trend(group_by: Literal["day", "hour", "shift"] = Query("day")):
+@app.get("/oee")
+def get_oee():
+    return query_latest_oee()
+
+# WebSocket route
+@app.websocket("/ws/oee")
+async def websocket_oee(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = query_latest_oee()
+            if data:
+                await websocket.send_json(data)
+            await asyncio.sleep(2)  # push setiap 2 detik
+    except WebSocketDisconnect:
+        print("Client disconnected")
+
+
+
+def query_oee_trend(group_by: str):
     if group_by == "day":
         cursor.execute("""
             SELECT DATE(timestamp) as date, 
@@ -83,6 +101,16 @@ def get_oee_trend(group_by: Literal["day", "hour", "shift"] = Query("day")):
             FROM sensor_data
             GROUP BY hour
             ORDER BY hour
+        """)
+    elif group_by == "minute":
+        cursor.execute("""
+            SELECT DATE_TRUNC('minute', timestamp) as minute,
+                   COUNT(*) FILTER (WHERE status = 'running')::float / COUNT(*) as availability,
+                   COUNT(*) FILTER (WHERE status = 'running' AND kecepatan > 0)::float / NULLIF(COUNT(*) FILTER (WHERE status = 'running'), 0) as performance,
+                   COUNT(*) FILTER (WHERE status = 'running' AND berat BETWEEN 9.5 AND 10.5)::float / NULLIF(COUNT(*) FILTER (WHERE status = 'running'), 0) as quality
+            FROM sensor_data
+            GROUP BY minute
+            ORDER BY minute
         """)
     else:  # shift
         cursor.execute("""
@@ -114,3 +142,23 @@ def get_oee_trend(group_by: Literal["day", "hour", "shift"] = Query("day")):
         })
 
     return data
+
+@app.get("/oee/trend")
+def get_oee_trend(group_by: Literal["day", "hour", "shift"] = Query("day")):
+    return query_oee_trend(group_by)
+
+@app.websocket("/ws/oee/trend")
+async def websocket_oee_trend(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        group_by = "day"  # default
+        query_params = websocket.query_params
+        if "group_by" in query_params:
+            group_by = query_params["group_by"]
+
+        while True:
+            data = query_oee_trend(group_by)
+            await websocket.send_text(json.dumps(data))
+            await asyncio.sleep(30)
+    except WebSocketDisconnect:
+        print("Client disconnected from trend")
